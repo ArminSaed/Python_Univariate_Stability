@@ -1,0 +1,53 @@
+
+
+
+# Example Data
+# Replace this with actual data loading as necessary
+data = pd.DataFrame({
+    'Environment': ['E1', 'E1', 'E1', 'E2', 'E2', 'E2', 'E3', 'E3', 'E3', 'E4', 'E4', 'E4'],
+    'Genotype': ['G1', 'G2', 'G3', 'G1', 'G2', 'G3', 'G1', 'G2', 'G3', 'G1', 'G2', 'G3'],
+    'Response': [346, 278.6, 337.6, 363, 185.6, 351.6, 286.6, 321.66, 423, 234, 304.6, 428],
+    'Rep': [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
+    'X1': [10, 20, 30, 15, 25, 35, 20, 30, 40, 25, 35, 45]
+})
+
+#print(data.head())
+
+
+stability = ParmUnivarStability(data['Environment'], data['Genotype'], data['Response'])
+# Perform the analysis
+results = stability.analyze()
+print(results)
+# Plot the Mean Response vs Coefficient of Variation
+stability.plot_mean_cv()
+
+
+
+
+
+
+
+
+# Example Data (replace with your actual DataFrame)
+data = pd.DataFrame({
+    'Environment': ['E1', 'E1', 'E1', 'E2', 'E2', 'E2', 'E3', 'E3', 'E3'],
+    'Genotype': ['G1', 'G2', 'G3', 'G1', 'G2', 'G3', 'G1', 'G2', 'G3'],
+    'Response': [47, 22, 33, 48, 27, 31, 24, 33, 25]
+})
+# Initialize the class with data
+stability = NonParmStability(data['Environment'], data['Genotype'], data['Response'])
+# Perform the analysis and get results
+stability.np1()
+stability.np2()
+stability.np3()
+stability.np4()
+stability.calc_nps()
+
+stability.s1()
+stability.s2()
+stability.s3()
+stability.s4()
+stability.s5()
+stability.s6()
+stability.calc_s()
+
