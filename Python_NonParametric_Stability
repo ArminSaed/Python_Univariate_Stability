@@ -1,0 +1,193 @@
+
+import numpy as np
+import pandas as pd
+
+class NonParmStability:
+    def __init__(self, environment, genotype, response):
+        
+        self.environment = environment
+        self.genotype = genotype
+        self.response = response
+        self.results = None
+        self.data = pd.DataFrame({
+            'Environment': environment,
+            'Genotype': genotype,
+            'Response': response
+        })
+
+    def preprocess_data(self):
+        # Pivot data
+        self.df = self.data.pivot_table(index='Genotype', columns='Environment', values='Response', aggfunc='mean').fillna(0)
+        self.dat_value = self.df.values
+        self.q = self.df.shape[1]  # Number of environments
+        self.G = self.df.shape[0]  # Number of genotypes
+    
+    def np1(self):
+        # Ensure preprocessing is done before calculating np1
+        if not hasattr(self, 'df'):
+            self.preprocess_data()
+        # Step 1: Rank each column (for each environment)
+        self.ranked_matrix = self.df.rank(axis=0)
+        # Step 2: Calculate the mean rank for each row (genotype)
+        self.median_ranked = self.ranked_matrix.median(axis=1)
+        # Step 3: Create a DataFrame where the mean rank is repeated across the number of environments
+        self.repeated_median_rank = pd.DataFrame(np.tile(self.median_ranked.values[:, np.newaxis], self.ranked_matrix.shape[1]),
+                                          index = self.ranked_matrix.index,
+                                          columns=self.ranked_matrix.columns)
+        # Step 4: Calculate the non-parametric stability measure np1
+        np1_1 = np.abs(self.ranked_matrix - self.repeated_median_rank)
+        np1 = np.sum(np1_1, axis=1)  / self.q
+        return np1
+
+    def np2(self):
+        np2_2 = np.abs(self.ranked_matrix - self.repeated_median_rank) / self.repeated_median_rank
+        np2 = np.sum(np2_2, axis=1)/self.q
+        return np2
+
+    def np3(self):
+        self.mean_ranked = self.ranked_matrix.mean(axis=1)
+        # Step 3: Create a DataFrame where the mean rank is repeated across the number of environments
+        self.repeated_mean_rank = pd.DataFrame(np.tile(self.mean_ranked.values[:, np.newaxis], self.ranked_matrix.shape[1]),
+                                          index = self.ranked_matrix.index,
+                                          columns=self.ranked_matrix.columns)
+
+        np3_3 = (self.ranked_matrix - self.repeated_mean_rank)**2 / self.q
+        np3 = np.sqrt(np.sum(np3_3, axis=1))/self.mean_ranked
+        return np3
+
+    def np4(self):
+        maxim = np.maximum(self.ranked_matrix.values, 0)
+        sum_vals = np.zeros(self.G)
+        for i in range(self.G):
+            for j in range(self.q):
+                for k in range(j, self.q):
+                    sum_vals[i] += np.abs(maxim[i, j] - maxim[i, k])
+        np4 = (2 / (self.q * (self.q - 1))) * (sum_vals / self.mean_ranked)
+        return np4
+
+    def calc_nps(self):
+        # Call each np method to compute the stability measures
+        np1 = self.np1()
+        np2 = self.np2()
+        np3 = self.np3()
+        np4 = self.np4()
+        
+        # Create a DataFrame with all stability measures
+        self.np_all = pd.DataFrame({
+            'np1': np1,
+            'np2': np2,
+            'np3': np3,
+            'np4': np4
+        }, index=self.ranked_matrix.index)
+        
+        return self.np_all
+
+
+    def s1(self):
+        maxim = np.maximum(self.ranked_matrix.values, 0)
+        sum_vals = np.zeros(self.G)
+        for i in range(self.G):
+            for j in range(self.q):
+                for k in range(j, self.q):
+                    sum_vals[i] += np.abs(np.floor(maxim[i, j] - maxim[i, k]))
+        s1 = (2 / (self.q * (self.q - 1))) * sum_vals
+        return s1
+
+    def s2(self):
+       maxim = np.maximum(self.ranked_matrix.values, 0)
+       s2 = np.sum((maxim - self.repeated_mean_rank) ** 2, axis=1) / (self.q  - 1)
+       return s2
+   
+    def s3(self):
+       maxim = np.maximum(self.ranked_matrix.values, 0)
+       s3 = np.sum((maxim - self.repeated_mean_rank) ** 2, axis=1) / self.mean_ranked
+       return s3
+
+    def s4(self):
+       maxim = np.maximum(self.ranked_matrix.values, 0)
+       s4_4 = np.sum((maxim - self.repeated_mean_rank) ** 2, axis=1) / self.q
+       s4 = np.sqrt(s4_4)
+       return s4
+
+    def s5(self):
+       maxim = np.maximum(self.ranked_matrix.values, 0)
+       s5 = np.sum(np.abs((maxim - self.repeated_mean_rank)), axis=1) / self.q
+       return s5
+
+    def s6(self):
+       maxim = np.maximum(self.ranked_matrix.values, 0)
+       s6 = np.sum(np.abs(maxim - self.repeated_mean_rank), axis=1) / self.mean_ranked
+       return s6
+
+
+    def calc_s(self):
+        # Call each np method to compute the stability measures
+        np1 = self.np1()
+        np2 = self.np2()
+        np3 = self.np3()
+        np4 = self.np4()
+        s1 = self.s1()
+        s2 = self.s2()
+        s3 = self.s3()
+        s4 = self.s4()
+        s5 = self.s5()
+        s6 = self.s6()
+        
+        # Create a DataFrame with all stability measures
+        self.s_all = pd.DataFrame({
+            'S1': s1,
+            'S2': s2,
+            'S3': s3,
+            'S4': s4,
+            'S5': s5,
+            'S6': s5
+        }, index=self.ranked_matrix.index)
+        
+        return self.s_all
+
+
+
+df = pd.read_excel("F:/Dr_Pourabughadareh/Dr_Pouraboughadare_example/Example_Site_5_Rep.xlsx")
+df.head()
+
+# Initialize the class with data
+stability = NonParmStability(df['Env'], df['Gen'], df['Yr'])
+# Perform the analysis and get results
+stability.np1()
+stability.np2()
+stability.np3()
+stability.np4()
+stability.calc_nps()
+
+stability.s1()
+stability.s2()
+stability.s3()
+stability.s4()
+stability.s5()
+stability.s6()
+stability.calc_s()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
