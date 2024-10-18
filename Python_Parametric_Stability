@@ -1,0 +1,154 @@
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+class ParmUnivarStability:
+    def __init__(self, environment, genotype, response):
+        
+        self.environment = environment
+        self.genotype = genotype
+        self.response = response
+        self.results = None
+        self.data = pd.DataFrame({
+            'Environment': environment,
+            'Genotype': genotype,
+            'Response': response
+        })
+        
+        
+    def preprocess_data(self):
+        # Pivot data
+        self.df = self.data.pivot_table(index='Genotype', columns='Environment', values='Response', aggfunc='mean').fillna(0)
+        self.dt_val = self.df.values
+        self.q = self.df.shape[1]  # Number of environments
+        self.G = self.df.shape[0]  # Number of genotypes
+
+    def calculate_statistics(self):
+        # Mean responses and variability calculations
+        m = np.repeat(self.dt_val.mean(axis=1)[np.newaxis, :], self.q, axis=0)
+        S2m = (self.dt_val - m.T) ** 2
+        S2i = S2m.sum(axis=1) / (self.q - 1)
+        CV = (np.sqrt(S2i) / self.dt_val.mean(axis=1)) * 100
+
+        # Output Mean and CV table
+        self.cv_ = pd.DataFrame({
+            'Mean Response': self.dt_val.mean(axis=1),
+            'Environment CV': CV,
+            'Environmental Variance': S2i,
+            'Environmental Standard Deviation': np.sqrt(S2i)
+        }, index=self.df.index)
+
+        return self.cv_
+
+    def wrickes_ecovalance(self):
+        # Wricke's Ecovalance calculation
+        m_E = np.repeat(self.dt_val.mean(axis=0)[np.newaxis, :], self.G, axis=0) 
+        m_G = np.repeat(self.dt_val.mean(axis=1)[np.newaxis, :], self.q, axis=0)
+        m_T = self.dt_val.mean()
+        W = (self.dt_val - m_E - m_G.T + m_T) ** 2
+        W2i = W.sum(axis=1)
+
+        self.eqoval_Rick = pd.DataFrame({'Wqovalance_rick': W2i}, index=self.df.index)
+        return self.eqoval_Rick
+
+    def shukla_stability_variance(self):
+        # Shukla's stability variance
+        W2i = self.eqoval_Rick['Wqovalance_rick'].values
+        Stability_var = ((self.G / ((self.G - 2) * (self.q - 1))) * W2i) - (W2i.sum() / ((self.G - 1) * (self.G - 2) * (self.q - 1)))
+
+        self.stab_var = pd.DataFrame({'Stability Variance (Shukla)': Stability_var}, index=self.df.index)
+        return self.stab_var
+
+    def regression_coefficients(self):
+        # Regression coefficients and deviation from regression
+        m_E = np.repeat(self.dt_val.mean(axis=0)[np.newaxis, :], self.G, axis=0)
+        m_G = np.repeat(self.dt_val.mean(axis=1)[np.newaxis, :], self.q, axis=0)
+        m_T = self.dt_val.mean()
+
+        reg_coef = ((self.dt_val - m_G.T) * (m_E - m_T)).sum(axis=1) / ((m_E - m_T) ** 2).sum(axis=1)
+        bss = (reg_coef ** 2) * ((m_E - m_T) ** 2).sum(axis=1)
+        s2di = (((self.dt_val - m_G.T) ** 2).sum(axis=1) - bss) / (self.q - 2)
+
+        self.reg_beta = pd.DataFrame({'Regression Coefficient (b)': reg_coef}, index=self.df.index)
+        self.reg_deviation = pd.DataFrame({'Deviation from Regression': s2di}, index=self.df.index)
+
+        return self.reg_beta, self.reg_deviation
+
+    def coefficient_of_determination(self):
+        # Coefficient of determination (R-squared)
+        m_G = np.repeat(self.dt_val.mean(axis=1)[np.newaxis, :], self.q, axis=0)
+        m_E = np.repeat(self.dt_val.mean(axis=0)[np.newaxis, :], self.G, axis=0)
+        m_T = self.dt_val.mean()
+
+        reg_coef = self.reg_beta['Regression Coefficient (b)'].values
+        bss = (reg_coef ** 2) * ((m_E - m_T) ** 2).sum(axis=1)
+        R2 = bss / ((self.dt_val - m_G.T) ** 2).sum(axis=1)
+
+        self.R2_Coef = pd.DataFrame({'R-squared': R2}, index=self.df.index)
+        return self.R2_Coef
+
+    def final_results(self):
+        # Final combined DataFrame
+        self.results = pd.DataFrame({
+            'Mean Response': self.dt_val.mean(axis=1),
+            'Environmental CV': self.cv_['Environment CV'],
+            'Environmental Variance': self.cv_['Environmental Variance'],
+            'Environmental Std Dev': self.cv_['Environmental Standard Deviation'],
+            'Eqovalance_Rick': self.eqoval_Rick['Wqovalance_rick'],
+            'Stability Variance (Shukla)': self.stab_var['Stability Variance (Shukla)'],
+            'Regression Coefficient (Beta:b)': self.reg_beta['Regression Coefficient (b)'],
+            'Deviation from Regression Line': self.reg_deviation['Deviation from Regression'],
+            'R-Squared (R^2)': self.R2_Coef['R-squared']
+        }, index=self.df.index)
+        return self.results
+
+    def plot_mean_cv(self):
+        # Plot Mean Response vs Coefficient of Variation
+        plt.figure(figsize=(10, 6))
+        plt.scatter(self.cv_["Mean Response"], self.cv_["Environment CV"], c='blue')
+
+        # Annotate each data point with the genotype index
+        for i in self.cv_.index:
+            plt.text(self.cv_["Mean Response"].loc[i], self.cv_["Environment CV"].loc[i], str(i), fontsize=10, ha='right', va='bottom')
+
+        # Add center lines
+        plt.axhline(y=self.cv_["Environment CV"].mean(), color='red', linestyle='--', label=f'Mean CV: {self.cv_["Environment CV"].mean():.2f}')
+        plt.axvline(x=self.cv_["Mean Response"].mean(), color='green', linestyle='--', label=f'Mean Response: {self.cv_["Mean Response"].mean():.2f}')
+
+        # Labels, title, and grid
+        plt.xlabel('Mean Response')
+        plt.ylabel('Coefficient of Variation')
+        plt.title('Mean Response vs. Coefficient of Variation')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def analyze(self):
+        self.preprocess_data()
+        self.calculate_statistics()
+        self.wrickes_ecovalance()
+        self.shukla_stability_variance()
+        self.regression_coefficients()
+        self.coefficient_of_determination()
+        self.final_results()
+        return self.results
+
+
+
+
+df = pd.read_excel("F:/Dr_Pourabughadareh/Dr_Pouraboughadare_example/Example_Site_5_Rep.xlsx")
+df.head()
+
+stab = ParmUnivarStability(df["Env"], df["Gen"], df["Yr"])
+results = stab.analyze()
+print(results)
+stab.plot_mean_cv()
+
+
+
+
+
+
+
+
